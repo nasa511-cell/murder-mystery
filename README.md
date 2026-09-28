@@ -1,5 +1,7 @@
 # 推理游戏（LangGraph）
 
+🚀 **在线试玩**：https://murder-mystery-ejhhxakwctgqbfqwunpg5g.streamlit.app/
+
 基于 LangGraph 的多 NPC 推理游戏。玩家通过询问嫌疑人、搜查场景线索，逐步逼近真相。
 
 ## 快速开始
@@ -12,14 +14,18 @@ python -m venv .venv
 source .venv/bin/activate    # Windows: .venv\Scripts\Activate.ps1
 
 # 2. 安装依赖
-pip install langgraph==1.0.0a3 langchain-core langchain-openai langgraph-checkpoint-sqlite python-dotenv
+pip install -e .
 
 # 3. 配置环境变量
 cp .env.example .env
 # 编辑 .env，填入 LLM_API_KEY
 
 # 4. 运行
-python "LangGraph实现v1.0.py"
+# 网页版：
+streamlit run web.py
+
+# 命令行版：
+python main.py
 ```
 
 ## 玩法
@@ -35,3 +41,4 @@ python "LangGraph实现v1.0.py"
 - LangGraph — 状态图与流程编排
 - LangChain + OpenAI — LLM 调用
 - SqliteSaver — 对话状态持久化（支持存档续玩）
+- Streamlit — 网页界面
