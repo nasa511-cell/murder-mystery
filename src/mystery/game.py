@@ -1,12 +1,12 @@
-"""
+﻿"""
 基于LangGraph实现推理游戏
 流程图：START-访问被提问者-询问-工具调用-回答-回到玩家
 """
 
-from NPCcharacter import character
+from mystery.npcs import character
 from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
-from clue import CLUE
+from mystery.clues import CLUE
 import asyncio
 from typing import TypedDict, Annotated
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
