@@ -4,13 +4,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 import io
+import os
 import uuid
 from contextlib import redirect_stdout
 
-import os
 import streamlit as st
 from langgraph.types import Command
 
+# 优先从 Streamlit Secrets 读 key（云端），本地 fallback 到 .env
 try:
     if "LLM_API_KEY" in st.secrets:
         os.environ["LLM_API_KEY"] = st.secrets["LLM_API_KEY"]
@@ -21,11 +22,37 @@ except Exception:
 
 from mystery.game import create_game_assistant
 
-
-
 st.set_page_config(page_title="推理游戏", page_icon="🔍", layout="centered")
 st.title("🔍 推理游戏")
 st.caption("基于 LangGraph 的多 NPC 推理游戏")
+
+# ---------- 游戏介绍 ----------
+with st.expander("📖 游戏介绍（点击展开 / 收起）", expanded=True):
+    st.markdown("""
+**案件**
+
+沈宅主人 **沈鹤年** 死在反锁的书房内。你是受邀前来调查的侦探。
+
+**嫌疑人**
+
+- **周德海** — 62 岁，沈宅管家
+- **林小满** — 22 岁，沈宅女仆
+- **陆沉** — 28 岁，沈宅司机
+
+每个人都有自己的秘密。真相不会主动告诉你。
+
+**玩法**
+
+- 输入 `询问` — 选择一名嫌疑人进行审讯
+- 输入 `搜查` — 检查某个地点寻找线索
+  （可搜查：书房 / 走廊 / 客厅 / 厨房 / 车库 / 林小满房间 / 周德海房间 / 主卧 / 花园）
+- 输入 `退出` — 结束游戏
+
+**目标**
+
+通过询问和搜查收集证据。当你在对话中触及真相的关键（人、事、物），
+真凶会逐渐松动——**坦白值达到 5 时，真相将被揭开**。
+""")
 
 # ---------- 会话初始化 ----------
 if "graph" not in st.session_state:
@@ -33,7 +60,7 @@ if "graph" not in st.session_state:
     st.session_state.thread_id = str(uuid.uuid4())
     st.session_state.config = {"configurable": {"thread_id": st.session_state.thread_id}}
     st.session_state.result = None
-    st.session_state.messages = []       # 展示用的消息流
+    st.session_state.messages = []
     st.session_state.started = False
 
 graph = st.session_state.graph
