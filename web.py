@@ -2,10 +2,21 @@ import io
 import uuid
 from contextlib import redirect_stdout
 
+import os
 import streamlit as st
 from langgraph.types import Command
 
+try:
+    if "LLM_API_KEY" in st.secrets:
+        os.environ["LLM_API_KEY"] = st.secrets["LLM_API_KEY"]
+        os.environ["LLM_BASE_URL"] = st.secrets.get("LLM_BASE_URL", os.getenv("LLM_BASE_URL", ""))
+        os.environ["LLM_MODEL_ID"] = st.secrets.get("LLM_MODEL_ID", os.getenv("LLM_MODEL_ID", ""))
+except Exception:
+    pass  # 本地没有 secrets.toml，走 .env 的 key
+
 from mystery.game import create_game_assistant
+
+
 
 st.set_page_config(page_title="推理游戏", page_icon="🔍", layout="centered")
 st.title("🔍 推理游戏")
