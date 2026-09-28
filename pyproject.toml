@@ -1,0 +1,19 @@
+[project]
+name = "murder-mystery"
+version = "0.1.0"
+description = "基于 LangGraph 的推理游戏"
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph==1.0.0a3",
+    "langchain-core>=0.3.86",
+    "langchain-openai>=0.3.33",
+    "langgraph-checkpoint-sqlite>=2.0.0",
+    "python-dotenv>=1.2.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]

@@ -1,0 +1,14 @@
+.env
+.venv/
+__pycache__/
+
+# 编译产物
+*.py[cod]
+
+# 存档
+game.db
+
+# 编辑器/系统
+.vscode/
+.idea/
+.DS_Store
