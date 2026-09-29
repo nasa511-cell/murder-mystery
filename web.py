@@ -96,6 +96,7 @@ def run_graph(resume_value=None):
                 "history": {"周德海": [], "林小满": [], "陆沉": []},
                 "score": 0,
                 "current_state": "",
+                "found_clues": [],
             }
             result = graph.invoke(initial_state, config=config)
         else:
