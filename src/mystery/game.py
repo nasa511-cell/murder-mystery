@@ -1,6 +1,8 @@
 ﻿"""
 基于LangGraph实现推理游戏
-流程图：START-访问被提问者-询问-工具调用-回答-回到玩家
+流程图：START-选择路径-询问-判定分数-回答问题-返回路径选择
+                     -搜查-找到结果-返回路径选择
+                     -退出-END
 """
 
 from mystery.npcs import character
@@ -18,6 +20,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+"""
+先写两个状态更新函数，保证history和clue是以追加机制更新，而非常见的覆盖
+"""
+
 def merge_history(old: dict | None, new: dict | None) -> dict:
     """reducer：按 NPC 合并消息列表。同一个 NPC 追加，不同 NPC 保留"""
     result = {k: list(v) for k, v in (old or {}).items()}
@@ -34,7 +40,9 @@ def merge_clues(old: list | None, new: list | None) -> list:
             result.append(c)
     return result
 
-
+"""
+LangGraph状态机
+"""
 class SearchState(TypedDict):
     current_npc: str
     history: Annotated[dict, merge_history]
@@ -42,15 +50,19 @@ class SearchState(TypedDict):
     current_state: str
     found_clues: Annotated[list, merge_clues]
 
-
+"""
+llm客户端
+"""
 llm = ChatOpenAI(
     model=os.getenv("LLM_MODEL_ID", "gpt-4o-mini"),
     api_key=os.getenv("LLM_API_KEY"),
     base_url=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
-    temperature=0.3
+    temperature=0.2
 )
 
-
+"""
+节点函数1：选择路径——询问/搜查/退出
+"""
 def select_way_node(state: SearchState) -> SearchState:
     way = interrupt("请选择询问/搜查/退出：")
     if way.lower() in ['quit', 'q', '退出', 'exit']:
@@ -63,34 +75,52 @@ def select_way_node(state: SearchState) -> SearchState:
     else:
         return {"current_state": ""}
 
-
+"""
+节点函数2：选择要询问的NPC
+"""
 def select_npc_node(state: SearchState) -> SearchState:
     name = interrupt("请输入对话对象：周德海/林小满/陆沉： ")
     if name in ["周德海", "林小满", "陆沉"]:
         return {"current_npc": name}
-    return {}
+    return {"current_npc" : ""}
 
 
+"""
+节点函数3：判定玩家是否接近真相
+"""
 def judge_truth(state: SearchState) -> SearchState:
     if state["current_npc"] != "陆沉":
         return {}
 
+    """
+    找到最后一次提问的内容
+    """
     message = ""
     for i in reversed(state["history"][state["current_npc"]]):
         if "player" in i:
             message = i["player"]
+            break
     prompt = f"""
-            你是侦探推理游戏的裁判。下面是一个玩家对嫌疑人陆沉说的话。
+你是侦探推理游戏的裁判。玩家正在审讯嫌疑人陆沉（他确实是凶手，但一直否认）。
+玩家说：{message}
 
-            玩家说：{message}
+请判断玩家的这句话，属于以下哪一类，只返回对应的数字：
 
-            请判断：
-            - 如果玩家提到了关键证据、真相、陆沉的母亲苏婉、匿名信、案发时间线等，返回 1
-            - 如果玩家只是谩骂、闲聊、没有新信息，返回 -1
-            - 如果你不好判断的，或者认为上述两种情况都没有的，返回0
+【返回 1】玩家在逼近真相。判断标准：
+- 玩家提出或追问了具体的、与案件核心相关的事实（案发时间、地点、动机、证据）
+- 玩家提到了陆沉的母亲苏婉、匿名信、案发时间线、书房里的物证等关键信息
+- 玩家在逻辑上把陆沉和案件绑在一起（例如："你22:30在后门""你母亲和沈鹤年的关系"）
+- 只是提到名字、泛泛地问"苏婉是谁"不算，必须是实质性的逼近
 
-            只返回且必须返回一个数：1 或 -1 或 0。不要标点，不要换行，不要解释，不要 Markdown。
-            """
+【返回 -1】玩家出现谩骂、人身攻击、侮辱性语言（无论是否同时提到关键信息）
+
+【返回 0】其他所有情况：
+- 闲聊、问候、跟案件无关的话题
+- 泛泛地问"你是谁""你在哪"这种基本信息
+- 重复问已经问过的内容
+
+只返回一个数：1、-1 或 0。不要标点，不要换行，不要解释。
+"""
     response = llm.invoke(prompt)
     reply = response.content
     if "-1" in reply.strip():
@@ -100,7 +130,9 @@ def judge_truth(state: SearchState) -> SearchState:
     else:
         return {"score": state["score"] + 1}
 
-
+"""
+节点函数4：询问节点
+"""
 def ask_question_node(state: SearchState) -> SearchState:
     player_input = interrupt("请提问： ")
 
@@ -114,20 +146,9 @@ def ask_question_node(state: SearchState) -> SearchState:
         }
     }
 
-
-def search_clue_node(state: SearchState) -> SearchState:
-    location = interrupt("请输入你想搜查的地点\n"
-                         + "可搜查地点：书房/走廊/客厅/厨房/车库/林小满房间/周德海房间/主卧/花园: ")
-
-    if location in ["书房", "走廊", "客厅", "厨房", "车库", "林小满房间", "周德海房间", "主卧", "花园"]:
-        clues = CLUE[location]
-        reply = "\n".join(clues)
-        print("\n" + reply)
-        new_clues = [f"【{location}】{c}" for c in clues]
-        return {"current_state": "", "found_clues": new_clues}
-
-    return {}
-
+"""
+节点函数5：回答节点
+"""
 
 def answer_question_node(state: SearchState) -> SearchState:
     npc = state["current_npc"]
@@ -179,6 +200,27 @@ def answer_question_node(state: SearchState) -> SearchState:
 
     return update
 
+"""
+节点函数6：搜寻节点
+"""
+def search_clue_node(state: SearchState) -> SearchState:
+    location = interrupt("请输入你想搜查的地点\n"
+                         + "可搜查地点：书房/走廊/客厅/厨房/车库/林小满房间/周德海房间/主卧/花园: ")
+
+    if location in ["书房", "走廊", "客厅", "厨房", "车库", "林小满房间", "周德海房间", "主卧", "花园"]:
+        clues = CLUE[location]
+        reply = "\n".join(clues)
+        print("\n" + reply)
+        new_clues = [f"【{location}】{c}" for c in clues]
+        return {"current_state": "", "found_clues": new_clues}
+
+    return {}
+
+
+
+"""
+几个条件边函数
+"""
 
 def judge_npc(state: SearchState) -> str:
     if state["current_npc"] in ["周德海", "林小满", "陆沉"]:
@@ -195,7 +237,9 @@ def judge_game_over(state: SearchState) -> str:
 def judge_way(state: SearchState):
     return state["current_state"]
 
-
+"""
+创建图
+"""
 def create_game_assistant():
     workflow = StateGraph(SearchState)
 

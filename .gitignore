@@ -12,3 +12,4 @@ game.db
 .vscode/
 .idea/
 .DS_Store
+error.log
