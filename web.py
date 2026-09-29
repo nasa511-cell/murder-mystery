@@ -134,7 +134,14 @@ for msg in st.session_state.messages:
             st.markdown(f"**{msg['name']}**")
             st.write(msg["content"])
     else:  # system（线索、提示）
-        st.caption(msg["content"])
+        # 按行拆分，每行作为一条独立列表项
+        lines = [l.strip() for l in msg["content"].split("\n") if l.strip()]
+        if len(lines) == 1:
+            st.caption(lines[0])
+        else:
+            with st.container(border=True):
+                for line in lines:
+                    st.markdown(f"- {line}")
 
 
 # ---------- 交互 ----------
